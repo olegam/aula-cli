@@ -85,7 +85,3 @@ If you want to add support for new Aula endpoints later, use discovery:
 
 - Typecheck: `bun run typecheck`
 - Tests: `bun run test`
-
-## Companion tool
-
-If your main goal is gallery filtering (for example keeping only photos that contain your own kids), use [`aula-cli-my-kids-photos`](https://github.com/olegam/aula-cli-my-kids-photos). That tool depends on this CLI for Aula authentication and gallery access, then applies local face recognition on downloaded photos.
