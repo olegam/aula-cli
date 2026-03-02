@@ -1,12 +1,19 @@
 import { getFlagValue, parseCsvNumbers, parseCsvStrings } from "../shared/args";
+import { getBootstrapDefaults } from "../shared/bootstrap-defaults";
+import { printOutput } from "../shared/output";
 import { createClientFromArgs } from "../shared/session";
 
 export const runNotificationsCommand = async (args: string[]): Promise<void> => {
-  const activeChildrenIds = parseCsvNumbers(getFlagValue(args, "children"));
-  const activeInstitutionCodes = parseCsvStrings(getFlagValue(args, "institutions"));
+  const defaults = await getBootstrapDefaults();
+  const explicitChildren = parseCsvNumbers(getFlagValue(args, "children"));
+  const explicitInstitutions = parseCsvStrings(getFlagValue(args, "institutions"));
+  const activeChildrenIds = explicitChildren.length ? explicitChildren : defaults.childIds;
+  const activeInstitutionCodes = explicitInstitutions.length ? explicitInstitutions : defaults.institutionCodes;
 
   if (!activeChildrenIds.length || !activeInstitutionCodes.length) {
-    throw new Error("Missing required flags: --children=1,2 and --institutions=CODE1,CODE2");
+    throw new Error(
+      "No child/institution IDs found. Run `aula-cli login` first or pass --children=1,2 and --institutions=CODE1,CODE2"
+    );
   }
 
   const client = await createClientFromArgs(args);
@@ -15,5 +22,15 @@ export const runNotificationsCommand = async (args: string[]): Promise<void> => 
     activeInstitutionCodes
   });
 
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(result, args, {
+    importantFields: [
+      "notificationEventType",
+      "notificationArea",
+      "triggered",
+      "senderName",
+      "relatedChildName",
+      "messageText",
+      "institutionCode"
+    ]
+  });
 };

@@ -1,12 +1,16 @@
 import { getNumberFlag, getFlagValue, parseCsvNumbers } from "../shared/args";
+import { getBootstrapDefaults } from "../shared/bootstrap-defaults";
+import { printOutput } from "../shared/output";
 import { createClientFromArgs } from "../shared/session";
 
 export const runGalleryCommand = async (args: string[]): Promise<void> => {
   const subcommand = args[0];
   const client = await createClientFromArgs(args);
+  const defaults = await getBootstrapDefaults();
 
   if (subcommand === "albums") {
-    const filterInstProfileIds = parseCsvNumbers(getFlagValue(args, "profiles"));
+    const explicitProfiles = parseCsvNumbers(getFlagValue(args, "profiles"));
+    const filterInstProfileIds = explicitProfiles.length ? explicitProfiles : defaults.profileIds;
     const albumsParams: Parameters<typeof client.v23.getAlbums>[0] = {
       index: getNumberFlag(args, "index", 0),
       limit: getNumberFlag(args, "limit", 12)
@@ -16,7 +20,9 @@ export const runGalleryCommand = async (args: string[]): Promise<void> => {
     }
 
     const result = await client.v23.getAlbums(albumsParams);
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["id", "title", "creationDate", "creator.name", "currentUserCanAddMedia", "currentUserCanEdit"]
+    });
     return;
   }
 
@@ -27,7 +33,8 @@ export const runGalleryCommand = async (args: string[]): Promise<void> => {
       throw new Error("Missing or invalid --album-id=<number>");
     }
 
-    const filterInstProfileIds = parseCsvNumbers(getFlagValue(args, "profiles"));
+    const explicitProfiles = parseCsvNumbers(getFlagValue(args, "profiles"));
+    const filterInstProfileIds = explicitProfiles.length ? explicitProfiles : defaults.profileIds;
     const mediaParams: Parameters<typeof client.v23.getMedia>[0] = {
       albumId,
       index: getNumberFlag(args, "index", 0),
@@ -38,7 +45,9 @@ export const runGalleryCommand = async (args: string[]): Promise<void> => {
     }
 
     const result = await client.v23.getMedia(mediaParams);
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["id", "title", "uploadedAt", "creator.name", "mediaType", "albumId"]
+    });
     return;
   }
 

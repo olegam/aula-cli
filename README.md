@@ -23,25 +23,32 @@ After linking, you can run `aula-cli ...` directly.
 3. Read messages in a specific thread:
    - `aula-cli messages thread --thread-id=<THREAD_ID> --page=0`
 
+By default, command output is shown as a table with key fields.
+- Use `--output=json` for raw JSON.
+- Use `--fields=fieldA,fieldB` to include extra columns.
+- Use `--fields=all` to include every available field in table mode.
+- Most commands auto-use IDs from `~/.aula-cli/bootstrap.json` if `--profiles`, `--children`, or `--institutions` are omitted.
+- `calendar events` defaults to a date range from today to +12 months if `--start` and `--end` are omitted.
+
 ## Main Commands
 
 - `login [--session=~/.aula-cli/latest-storage-state.json] [--wait=180]`
-- `bootstrap [--session=...] [--base-url=...]`
-- `me [--session=...]`
-- `notifications --children=1,2 --institutions=CODE [--session=...]`
-- `posts --profiles=5001,5002 [--index=0] [--limit=10] [--session=...]`
-- `messages threads [--page=0] [--session=...]`
-- `messages thread --thread-id=123 [--page=0] [--session=...]`
-- `calendar important-dates [--limit=11] [--include-today=false] [--session=...]`
-- `calendar events --profiles=5001,5002 --start='...' --end='...' [--session=...]`
-- `presence daily-overview --children=1,2 [--session=...]`
-- `presence states --profiles=5001,5002 [--session=...]`
-- `presence config --children=1,2 [--session=...]`
-- `presence closed-days --institutions=CODE [--session=...]`
-- `presence opening-hours --institutions=CODE --start-date=YYYY-MM-DD --end-date=YYYY-MM-DD [--session=...]`
-- `gallery albums [--profiles=5001,5002] [--limit=12 --index=0] [--session=...]`
-- `gallery media --album-id=123 [--profiles=5001,5002] [--limit=12 --index=0] [--session=...]`
-- `fetch <path> [--session=...] [--base-url=...] [--query=a=b&c=d]`
+- `bootstrap [--session=...] [--base-url=...] [--output=json]`
+- `me [--session=...] [--output=json]`
+- `notifications [--children=1,2] [--institutions=CODE] [--session=...] [--output=json]`
+- `posts [--profiles=5001,5002] [--index=0] [--limit=10] [--session=...] [--output=json]`
+- `messages threads [--page=0] [--session=...] [--output=json]`
+- `messages thread --thread-id=123 [--page=0] [--session=...] [--output=json]`
+- `calendar important-dates [--limit=11] [--include-today=false] [--session=...] [--output=json]`
+- `calendar events [--profiles=5001,5002] [--start='...'] [--end='...'] [--session=...] [--output=json]`
+- `presence daily-overview [--children=1,2] [--session=...] [--output=json]`
+- `presence states [--profiles=5001,5002] [--session=...] [--output=json]`
+- `presence config [--children=1,2] [--session=...] [--output=json]`
+- `presence closed-days [--institutions=CODE] [--session=...] [--output=json]`
+- `presence opening-hours [--institutions=CODE] --start-date=YYYY-MM-DD --end-date=YYYY-MM-DD [--session=...] [--output=json]`
+- `gallery albums [--profiles=5001,5002] [--limit=12 --index=0] [--session=...] [--output=json]`
+- `gallery media --album-id=123 [--profiles=5001,5002] [--limit=12 --index=0] [--session=...] [--output=json]`
+- `fetch <path> [--session=...] [--base-url=...] [--query=a=b&c=d] [--output=json]`
 
 ## Session Files
 

@@ -39,6 +39,12 @@ const cookieHeaderFromState = (session: SessionState): string | undefined => {
   return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join("; ");
 };
 
+const getCookieValue = (session: SessionState, name: string): string | undefined => {
+  const cookies = session.storageState?.cookies ?? [];
+  const match = cookies.find((cookie) => cookie.name.toLowerCase() === name.toLowerCase());
+  return match?.value;
+};
+
 export const createFetchTransport = (session: SessionState): HttpTransport => {
   return {
     async request<T>(config: RequestConfig): Promise<T> {
@@ -53,6 +59,13 @@ export const createFetchTransport = (session: SessionState): HttpTransport => {
 
       if (cookieHeader && !headers.has("Cookie")) {
         headers.set("Cookie", cookieHeader);
+      }
+
+      if ((config.method ?? "GET") === "POST" && !headers.has("csrfp-token")) {
+        const csrfCookie = getCookieValue(session, "Csrfp-Token");
+        if (csrfCookie) {
+          headers.set("csrfp-token", csrfCookie);
+        }
       }
 
       let body: string | undefined;

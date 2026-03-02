@@ -1,10 +1,14 @@
 import { getFlagValue, getNumberFlag, parseCsvNumbers } from "../shared/args";
+import { printOutput } from "../shared/output";
+import { getBootstrapDefaults } from "../shared/bootstrap-defaults";
 import { createClientFromArgs } from "../shared/session";
 
 export const runPostsCommand = async (args: string[]): Promise<void> => {
-  const institutionProfileIds = parseCsvNumbers(getFlagValue(args, "profiles"));
+  const explicitProfileIds = parseCsvNumbers(getFlagValue(args, "profiles"));
+  const defaults = await getBootstrapDefaults();
+  const institutionProfileIds = explicitProfileIds.length ? explicitProfileIds : defaults.profileIds;
   if (!institutionProfileIds.length) {
-    throw new Error("Missing required flag: --profiles=5008819,5008813");
+    throw new Error("No profile IDs found. Run `aula-cli login` first or pass --profiles=5008819,5008813");
   }
 
   const client = await createClientFromArgs(args);
@@ -14,5 +18,16 @@ export const runPostsCommand = async (args: string[]): Promise<void> => {
     limit: getNumberFlag(args, "limit", 10)
   });
 
-  console.log(JSON.stringify(result, null, 2));
+  printOutput(result, args, {
+    importantFields: [
+      "id",
+      "title",
+      "timestamp",
+      "content.html",
+      "ownerProfile.fullName",
+      "isImportant",
+      "expireAt",
+      "relatedProfiles"
+    ]
+  });
 };

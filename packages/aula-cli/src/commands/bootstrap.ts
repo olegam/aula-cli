@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClientFromArgs } from "../shared/session";
 import { getDefaultBootstrapPath, getStateDir } from "../shared/paths";
+import { printOutput } from "../shared/output";
 
 type TraverseState = {
   profileIds: Set<number>;
@@ -144,6 +145,8 @@ export const runBootstrapCommand = async (args: string[]): Promise<void> => {
   const bootstrap = buildBootstrapData(profilesResponse.data, contextResponse.data);
   const outputPath = await saveBootstrapData(bootstrap);
 
-  console.log(JSON.stringify(bootstrap, null, 2));
+  printOutput(bootstrap, args, {
+    importantFields: ["profileIds", "childIds", "institutionCodes"]
+  });
   console.log(`Saved bootstrap hints to ${outputPath}`);
 };

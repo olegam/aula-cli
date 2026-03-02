@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createAulaApiClient, type BrowserStorageState, type SessionState } from "@aula/api-client";
 import { getDefaultSessionPath } from "../shared/paths";
+import { printOutput } from "../shared/output";
 
 const parseArgs = (args: string[]) => {
   const path = args[0];
@@ -45,5 +46,5 @@ export const runFetchCommand = async (args: string[]): Promise<void> => {
 
   const client = createAulaApiClient(session);
   const data = await client.discovered.get<unknown>(parsed.path, parsed.query);
-  console.log(JSON.stringify(data, null, 2));
+  printOutput(data, args);
 };

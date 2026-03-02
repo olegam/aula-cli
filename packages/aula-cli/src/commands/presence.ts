@@ -1,60 +1,89 @@
 import { getFlagValue, parseCsvNumbers, parseCsvStrings } from "../shared/args";
+import { getBootstrapDefaults } from "../shared/bootstrap-defaults";
+import { printOutput } from "../shared/output";
 import { createClientFromArgs } from "../shared/session";
 
 export const runPresenceCommand = async (args: string[]): Promise<void> => {
   const subcommand = args[0];
   const client = await createClientFromArgs(args);
+  const defaults = await getBootstrapDefaults();
 
   if (subcommand === "daily-overview") {
-    const childIds = parseCsvNumbers(getFlagValue(args, "children"));
+    const explicitChildren = parseCsvNumbers(getFlagValue(args, "children"));
+    const childIds = explicitChildren.length ? explicitChildren : defaults.childIds;
     if (!childIds.length) {
-      throw new Error("Missing required flag: --children=5008813,5011592");
+      throw new Error("No child IDs found. Run `aula-cli login` first or pass --children=5008813,5011592");
     }
 
     const result = await client.v23.getPresenceDailyOverview({ childIds });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: [
+        "institutionProfile.fullName",
+        "mainGroup.name",
+        "status",
+        "checkInTime",
+        "checkOutTime",
+        "entryTime",
+        "exitTime",
+        "location",
+        "comment"
+      ]
+    });
     return;
   }
 
   if (subcommand === "states") {
-    const institutionProfileIds = parseCsvNumbers(getFlagValue(args, "profiles"));
+    const explicitProfiles = parseCsvNumbers(getFlagValue(args, "profiles"));
+    const defaultPresenceProfiles = defaults.childIds.length ? defaults.childIds : defaults.profileIds;
+    const institutionProfileIds = explicitProfiles.length ? explicitProfiles : defaultPresenceProfiles;
     if (!institutionProfileIds.length) {
-      throw new Error("Missing required flag: --profiles=5008819,5008813");
+      throw new Error("No profile IDs found. Run `aula-cli login` first or pass --profiles=5008819,5008813");
     }
 
     const result = await client.v23.getPresenceStates({ institutionProfileIds });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["id", "status", "location", "checkInTime", "checkOutTime", "institutionProfile.fullName"]
+    });
     return;
   }
 
   if (subcommand === "config") {
-    const childIds = parseCsvNumbers(getFlagValue(args, "children"));
+    const explicitChildren = parseCsvNumbers(getFlagValue(args, "children"));
+    const childIds = explicitChildren.length ? explicitChildren : defaults.childIds;
     if (!childIds.length) {
-      throw new Error("Missing required flag: --children=5008813,5011592");
+      throw new Error("No child IDs found. Run `aula-cli login` first or pass --children=5008813,5011592");
     }
 
     const result = await client.v23.getPresenceConfigurationByChildIds({ childIds });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["childInstitutionProfileId", "settings", "id", "institutionCode"]
+    });
     return;
   }
 
   if (subcommand === "closed-days") {
-    const institutionCodes = parseCsvStrings(getFlagValue(args, "institutions"));
+    const explicitInstitutions = parseCsvStrings(getFlagValue(args, "institutions"));
+    const institutionCodes = explicitInstitutions.length ? explicitInstitutions : defaults.institutionCodes;
     if (!institutionCodes.length) {
-      throw new Error("Missing required flag: --institutions=G17143");
+      throw new Error("No institution codes found. Run `aula-cli login` first or pass --institutions=G17143");
     }
 
     const result = await client.v23.getPresenceClosedDays({ institutionCodes });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["date", "title", "closed", "institutionCode"]
+    });
     return;
   }
 
   if (subcommand === "opening-hours") {
-    const institutionCodes = parseCsvStrings(getFlagValue(args, "institutions"));
+    const explicitInstitutions = parseCsvStrings(getFlagValue(args, "institutions"));
+    const institutionCodes = explicitInstitutions.length ? explicitInstitutions : defaults.institutionCodes;
     const startDate = getFlagValue(args, "start-date");
     const endDate = getFlagValue(args, "end-date");
     if (!institutionCodes.length || !startDate || !endDate) {
-      throw new Error("Usage: presence opening-hours --institutions=G17143 --start-date=2026-03-02 --end-date=2026-03-08");
+      throw new Error(
+        "Usage: presence opening-hours [--institutions=G17143] --start-date=2026-03-02 --end-date=2026-03-08 (institutions default from bootstrap)"
+      );
     }
 
     const result = await client.v23.getPresenceOpeningHoursByInstitutionCodes({
@@ -62,7 +91,9 @@ export const runPresenceCommand = async (args: string[]): Promise<void> => {
       startDate,
       endDate
     });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["date", "openingHours", "institutionCode", "startTime", "endTime"]
+    });
     return;
   }
 

@@ -1,4 +1,5 @@
 import { getFlagValue, getNumberFlag } from "../shared/args";
+import { printOutput } from "../shared/output";
 import { createClientFromArgs } from "../shared/session";
 
 export const runMessagesCommand = async (args: string[]): Promise<void> => {
@@ -9,7 +10,17 @@ export const runMessagesCommand = async (args: string[]): Promise<void> => {
     const result = await client.v23.getThreads({
       page: getNumberFlag(args, "page", 0)
     });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: [
+        "id",
+        "subject",
+        "creator.fullName",
+        "latestMessage.sendDateTime",
+        "latestMessage.text",
+        "read",
+        "regardingChildren"
+      ]
+    });
     return;
   }
 
@@ -24,7 +35,9 @@ export const runMessagesCommand = async (args: string[]): Promise<void> => {
       threadId,
       page: getNumberFlag(args, "page", 0)
     });
-    console.log(JSON.stringify(result, null, 2));
+    printOutput(result, args, {
+      importantFields: ["id", "sendDateTime", "senderName", "text", "creator.fullName", "attachments", "isForwarded"]
+    });
     return;
   }
 
