@@ -1,6 +1,6 @@
 # Aula CLI
 
-Read-only CLI for Aula with browser-based MitID login and session reuse.
+Read-only CLI for Aula with browser-based MitID login and session reuse. Also check out the companion tool [`aula-cli-my-kids-photos`](https://github.com/olegam/aula-cli-my-kids-photos) for saving photos that contain your own kids.
 
 Useful for integrating Aula with personal AI agents such as OpenClaw. For example tell your agent:
 
@@ -85,3 +85,7 @@ If you want to add support for new Aula endpoints later, use discovery:
 
 - Typecheck: `bun run typecheck`
 - Tests: `bun run test`
+
+## Companion tool
+
+If your main goal is gallery filtering (for example keeping only photos that contain your own kids), use [`aula-cli-my-kids-photos`](https://github.com/olegam/aula-cli-my-kids-photos). That tool depends on this CLI for Aula authentication and gallery access, then applies local face recognition on downloaded photos.
