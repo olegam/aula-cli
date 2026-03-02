@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/aula-api-client" },
+    { "path": "./packages/aula-cli" }
+  ]
+}

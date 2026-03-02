@@ -1,0 +1,17 @@
+{
+  "name": "aula-cli-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "discover": "bun run --filter @aula/cli discover",
+    "fetch": "bun run --filter @aula/cli fetch",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "latest"
+  }
+}
