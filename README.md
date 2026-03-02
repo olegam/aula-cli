@@ -2,6 +2,21 @@
 
 Read-only CLI for Aula with browser-based MitID login and session reuse.
 
+Useful for integrating Aula with personal AI agents such as OpenClaw. For example tell your agent:
+
+```
+install this: https://github.com/olegam/aula-cli
+let me know when you are ready to authenticate with MitID in the browser.
+then test the basic endpoints for getting json data of posts, messages, calendar, galleries etc.
+```
+
+And tell your agent what behavior you want. For example:
+
+```
+setup instructions in your heartbeat to check for new aula content (messages, posts, album galleries, calendar entries etc).
+keep track of the last items we have already seen. when there is new content send me a message with a short summary followed by the original content.
+```
+
 ## Install
 
 1. Install dependencies:
