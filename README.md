@@ -28,7 +28,7 @@ By default, command output is shown as a table with key fields.
 - Use `--fields=fieldA,fieldB` to include extra columns.
 - Use `--fields=all` to include every available field in table mode.
 - Most commands auto-use IDs from `~/.aula-cli/bootstrap.json` if `--profiles`, `--children`, or `--institutions` are omitted.
-- `calendar events` defaults to a date range from today to +12 months if `--start` and `--end` are omitted.
+- `calendar events` defaults to a date range from today to +50 days if `--start` and `--end` are omitted.
 
 ## Main Commands
 

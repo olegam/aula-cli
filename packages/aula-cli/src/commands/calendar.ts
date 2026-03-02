@@ -26,7 +26,7 @@ const getDefaultCalendarRange = (): { start: string; end: string } => {
   startDate.setHours(0, 0, 0, 0);
 
   const endDate = new Date(startDate);
-  endDate.setMonth(endDate.getMonth() + 12);
+  endDate.setDate(endDate.getDate() + 50);
 
   return {
     start: toAulaDateTime(startDate),
@@ -59,7 +59,7 @@ export const runCalendarCommand = async (args: string[]): Promise<void> => {
 
     if (!instProfileIds.length) {
       throw new Error(
-        "Usage: calendar events [--profiles=5001,5002] [--start='2026-03-02 00:00:00.0000+01:00'] [--end='2027-03-02 00:00:00.0000+01:00'] (profiles default from bootstrap; date range defaults to next 12 months)"
+        "Usage: calendar events [--profiles=5001,5002] [--start='2026-03-02 00:00:00.0000+01:00'] [--end='2026-04-21 00:00:00.0000+01:00'] (profiles default from bootstrap; date range defaults to next 50 days)"
       );
     }
 
