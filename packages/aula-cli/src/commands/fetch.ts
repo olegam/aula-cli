@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createAulaApiClient, type BrowserStorageState, type SessionState } from "@aula/api-client";
+import { getDefaultSessionPath } from "../shared/paths";
 
 const parseArgs = (args: string[]) => {
   const path = args[0];
@@ -25,7 +26,7 @@ const parseArgs = (args: string[]) => {
 
   return {
     path,
-    sessionPath: sessionArg ? sessionArg.slice("--session=".length) : ".aula/latest-storage-state.json",
+    sessionPath: sessionArg ? sessionArg.slice("--session=".length) : getDefaultSessionPath(),
     baseUrl: baseUrlArg ? baseUrlArg.slice("--base-url=".length) : "https://www.aula.dk",
     query
   };

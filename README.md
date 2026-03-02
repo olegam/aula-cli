@@ -1,80 +1,63 @@
-# Aula CLI (Discovery First)
+# Aula CLI
 
-This repository bootstraps a Bun + TypeScript workspace for exploring Aula's undocumented API through a real authenticated browser session.
+Read-only CLI for Aula with browser-based MitID login and session reuse.
 
-## Packages
-
-- `@aula/api-client`: read-only API transport + endpoint helpers. No CLI concerns.
-- `@aula/cli`: command-line entrypoint that handles browser auth discovery and data fetching.
-
-## Why Playwright
-
-MitID 2FA requires a real browser flow. The `discover` command launches headed Chromium and lets you complete login manually. During your browsing session, it captures request/response metadata so we can build a safe, read-only API surface.
-
-## Setup
+## Install
 
 1. Install dependencies:
    - `bun install`
-2. Install Playwright browser binaries:
+2. Install Playwright Chromium:
    - `bunx playwright install chromium`
+3. Link the CLI command locally:
+   - `cd packages/aula-cli && bun link`
 
-## Commands
+After linking, you can run `aula-cli ...` directly.
 
-- Discovery session:
-  - `bun run discover`
-  - Optional output base directory: `bun run discover --out=.aula/discovery`
-  - Optional timed mode: `bun run discover --login-wait=180 --browse-wait=240`
-  - Graceful stop: press `Ctrl+C` to finalize capture files before exit
-- Bootstrap IDs from your authenticated context:
-  - `bun run --filter @aula/cli src/index.ts bootstrap --session=packages/aula-cli/.aula/latest-storage-state.json`
-  - Saves inferred IDs and suggested flags to `.aula/bootstrap.json`
-- Read-only profile context:
-  - `bun run --filter @aula/cli src/index.ts me --session=packages/aula-cli/.aula/latest-storage-state.json`
-- Read-only notifications:
-  - `bun run --filter @aula/cli src/index.ts notifications --children=5008813,5011592 --institutions=G17143 --session=...`
-- Read-only posts feed:
-  - `bun run --filter @aula/cli src/index.ts posts --profiles=5008819,5008813,5011592 --limit=10 --session=...`
-- Read-only messages:
-  - `bun run --filter @aula/cli src/index.ts messages threads --page=0 --session=...`
-  - `bun run --filter @aula/cli src/index.ts messages thread --thread-id=158049647 --page=0 --session=...`
-- Read-only calendar:
-  - `bun run --filter @aula/cli src/index.ts calendar important-dates --limit=11 --session=...`
-  - `bun run --filter @aula/cli src/index.ts calendar events --profiles=5008819,5008813 --start='2026-03-02 00:00:00.0000+01:00' --end='2026-03-03 00:00:00.0000+01:00' --session=...`
-- Read-only presence:
-  - `bun run --filter @aula/cli src/index.ts presence daily-overview --children=5008813,5011592 --session=...`
-  - `bun run --filter @aula/cli src/index.ts presence states --profiles=5008819,5008813 --session=...`
-  - `bun run --filter @aula/cli src/index.ts presence config --children=5008813,5011592 --session=...`
-  - `bun run --filter @aula/cli src/index.ts presence closed-days --institutions=G17143 --session=...`
-  - `bun run --filter @aula/cli src/index.ts presence opening-hours --institutions=G17143 --start-date=2026-03-02 --end-date=2026-03-08 --session=...`
-- Read-only gallery:
-  - `bun run --filter @aula/cli src/index.ts gallery albums --profiles=5008813,5011592 --limit=12 --session=...`
-  - `bun run --filter @aula/cli src/index.ts gallery media --album-id=4006874 --profiles=5008813,5011592 --limit=12 --session=...`
-- Read-only fetch from an endpoint:
-  - `bun run fetch /api/v17/... --session=.aula/latest-storage-state.json`
-  - Optional query string: `--query=limit=20&offset=0`
-  - Optional base URL override: `--base-url=https://www.aula.dk`
+## Quick Start
 
-## Discovery Output
+1. Login (or refresh expired session):
+   - `aula-cli login`
+   - This also refreshes and saves bootstrap IDs to `~/.aula-cli/bootstrap.json`.
+2. List recent message threads:
+   - `aula-cli messages threads --page=0`
+3. Read messages in a specific thread:
+   - `aula-cli messages thread --thread-id=<THREAD_ID> --page=0`
 
-Each run writes to a timestamped directory under `.aula/discovery/`:
+## Main Commands
 
-- `requests.ndjson`
-- `responses.ndjson`
-- `endpoint-catalog.json`
-- `storage-state.json`
-- `metadata.json`
+- `login [--session=~/.aula-cli/latest-storage-state.json] [--wait=180]`
+- `bootstrap [--session=...] [--base-url=...]`
+- `me [--session=...]`
+- `notifications --children=1,2 --institutions=CODE [--session=...]`
+- `posts --profiles=5001,5002 [--index=0] [--limit=10] [--session=...]`
+- `messages threads [--page=0] [--session=...]`
+- `messages thread --thread-id=123 [--page=0] [--session=...]`
+- `calendar important-dates [--limit=11] [--include-today=false] [--session=...]`
+- `calendar events --profiles=5001,5002 --start='...' --end='...' [--session=...]`
+- `presence daily-overview --children=1,2 [--session=...]`
+- `presence states --profiles=5001,5002 [--session=...]`
+- `presence config --children=1,2 [--session=...]`
+- `presence closed-days --institutions=CODE [--session=...]`
+- `presence opening-hours --institutions=CODE --start-date=YYYY-MM-DD --end-date=YYYY-MM-DD [--session=...]`
+- `gallery albums [--profiles=5001,5002] [--limit=12 --index=0] [--session=...]`
+- `gallery media --album-id=123 [--profiles=5001,5002] [--limit=12 --index=0] [--session=...]`
+- `fetch <path> [--session=...] [--base-url=...] [--query=a=b&c=d]`
 
-Also writes convenience files:
+## Session Files
 
-- `.aula/latest-storage-state.json`
-- `.aula/latest-capture-dir.txt`
+- Default state directory: `~/.aula-cli`
+- Default session path: `~/.aula-cli/latest-storage-state.json`
+- Bootstrap hints path: `~/.aula-cli/bootstrap.json`
+- Re-run `login` whenever session expires.
+- Keep `~/.aula-cli` private; it may contain sensitive session data.
+- Optional override: set `AULA_CLI_HOME=/custom/path`.
 
-## Security Notes
+## Future Endpoint Support (Discovery)
 
-- Captured traffic can contain personal and school data. Treat `.aula/` as sensitive.
-- Header keys like `authorization`, `cookie`, and token-like fields are redacted.
-- Use this tool for read-only exploration. Mutation endpoints are intentionally out of scope.
-- Never commit captured auth/session files.
+If you want to add support for new Aula endpoints later, use discovery:
+
+- `aula-cli discover`
+- Outputs API traffic and endpoint catalog under `~/.aula-cli/discovery/...`
 
 ## Development
 

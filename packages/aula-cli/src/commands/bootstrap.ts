@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createClientFromArgs } from "../shared/session";
+import { getDefaultBootstrapPath, getStateDir } from "../shared/paths";
 
 type TraverseState = {
   profileIds: Set<number>;
@@ -86,13 +87,19 @@ const traverse = (value: unknown, state: TraverseState, seen: WeakSet<object>) =
   }
 };
 
-export const runBootstrapCommand = async (args: string[]): Promise<void> => {
-  const client = await createClientFromArgs(args);
-  const [profilesResponse, contextResponse] = await Promise.all([
-    client.v23.getProfilesByLogin(),
-    client.v23.getProfileContext()
-  ]);
+export type BootstrapData = {
+  profileIds: number[];
+  childIds: number[];
+  institutionCodes: string[];
+  suggestedFlags: {
+    posts: string;
+    notifications: string;
+    presence: string;
+    calendarEvents: string;
+  };
+};
 
+export const buildBootstrapData = (profilesData: unknown, contextData: unknown): BootstrapData => {
   const state: TraverseState = {
     profileIds: new Set<number>(),
     childIds: new Set<number>(),
@@ -100,14 +107,14 @@ export const runBootstrapCommand = async (args: string[]): Promise<void> => {
   };
 
   const seen = new WeakSet<object>();
-  traverse(profilesResponse.data, state, seen);
-  traverse(contextResponse.data, state, seen);
+  traverse(profilesData, state, seen);
+  traverse(contextData, state, seen);
 
   const profileIds = [...state.profileIds].sort((a, b) => a - b);
   const childIds = [...state.childIds].sort((a, b) => a - b);
   const institutionCodes = [...state.institutionCodes].sort((a, b) => a.localeCompare(b));
 
-  const bootstrap = {
+  return {
     profileIds,
     childIds,
     institutionCodes,
@@ -118,11 +125,25 @@ export const runBootstrapCommand = async (args: string[]): Promise<void> => {
       calendarEvents: `--profiles=${profileIds.join(",")}`
     }
   };
+};
 
-  const outputDir = resolve(".aula");
+export const saveBootstrapData = async (bootstrap: BootstrapData, outputPath = getDefaultBootstrapPath()) => {
+  const outputDir = resolve(getStateDir());
   await mkdir(outputDir, { recursive: true });
-  await writeFile(resolve(outputDir, "bootstrap.json"), JSON.stringify(bootstrap, null, 2), "utf8");
+  await writeFile(outputPath, JSON.stringify(bootstrap, null, 2), "utf8");
+  return outputPath;
+};
+
+export const runBootstrapCommand = async (args: string[]): Promise<void> => {
+  const client = await createClientFromArgs(args);
+  const [profilesResponse, contextResponse] = await Promise.all([
+    client.v23.getProfilesByLogin(),
+    client.v23.getProfileContext()
+  ]);
+
+  const bootstrap = buildBootstrapData(profilesResponse.data, contextResponse.data);
+  const outputPath = await saveBootstrapData(bootstrap);
 
   console.log(JSON.stringify(bootstrap, null, 2));
-  console.log(`Saved bootstrap hints to ${resolve(outputDir, "bootstrap.json")}`);
+  console.log(`Saved bootstrap hints to ${outputPath}`);
 };

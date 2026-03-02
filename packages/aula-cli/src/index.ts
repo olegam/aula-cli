@@ -3,19 +3,24 @@ import { runCalendarCommand } from "./commands/calendar";
 import { runDiscoverCommand } from "./commands/discover";
 import { runFetchCommand } from "./commands/fetch";
 import { runGalleryCommand } from "./commands/gallery";
+import { runLoginCommand } from "./commands/login";
 import { runMeCommand } from "./commands/me";
 import { runMessagesCommand } from "./commands/messages";
 import { runNotificationsCommand } from "./commands/notifications";
 import { runPostsCommand } from "./commands/posts";
 import { runPresenceCommand } from "./commands/presence";
+import { getDefaultDiscoveryDir, getDefaultSessionPath } from "./shared/paths";
 
 const printHelp = () => {
-  console.log("Aula CLI (discovery-first)");
+  const defaultSessionPath = getDefaultSessionPath();
+  const defaultDiscoveryDir = getDefaultDiscoveryDir();
+  console.log("Aula CLI");
   console.log("");
   console.log("Commands:");
-  console.log("  discover [--out=.aula/discovery] [--login-wait=120] [--browse-wait=180]");
+  console.log(`  login [--session=${defaultSessionPath}] [--wait=180] (refreshes session + bootstrap)`);
+  console.log(`  discover [--out=${defaultDiscoveryDir}] [--login-wait=120] [--browse-wait=180]`);
   console.log("  bootstrap [--session=...] [--base-url=...]");
-  console.log("  me [--session=.aula/latest-storage-state.json] [--base-url=https://www.aula.dk]");
+  console.log(`  me [--session=${defaultSessionPath}] [--base-url=https://www.aula.dk]`);
   console.log("  notifications --children=1,2 --institutions=CODE [--session=...]");
   console.log("  posts --profiles=5001,5002 [--index=0] [--limit=10] [--session=...]");
   console.log("  messages threads [--page=0] [--session=...]");
@@ -29,7 +34,7 @@ const printHelp = () => {
   console.log("  presence opening-hours --institutions=CODE --start-date=YYYY-MM-DD --end-date=YYYY-MM-DD [--session=...]");
   console.log("  gallery albums [--profiles=5001,5002] [--limit=12 --index=0] [--session=...]");
   console.log("  gallery media --album-id=123 [--profiles=5001,5002] [--limit=12 --index=0] [--session=...]");
-  console.log("  fetch <path> [--session=.aula/latest-storage-state.json] [--base-url=https://www.aula.dk] [--query=a=b&c=d]");
+  console.log(`  fetch <path> [--session=${defaultSessionPath}] [--base-url=https://www.aula.dk] [--query=a=b&c=d]`);
 };
 
 const main = async () => {
@@ -42,6 +47,11 @@ const main = async () => {
 
   if (command === "discover") {
     await runDiscoverCommand(args);
+    return;
+  }
+
+  if (command === "login") {
+    await runLoginCommand(args);
     return;
   }
 

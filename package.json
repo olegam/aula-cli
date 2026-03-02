@@ -5,6 +5,7 @@
     "packages/*"
   ],
   "scripts": {
+    "login": "bun run --filter @aula/cli login",
     "discover": "bun run --filter @aula/cli discover",
     "fetch": "bun run --filter @aula/cli fetch",
     "typecheck": "bun run --filter '*' typecheck",

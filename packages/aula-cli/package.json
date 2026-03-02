@@ -5,7 +5,11 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "bin": {
+    "aula-cli": "./bin/aula-cli"
+  },
   "scripts": {
+    "login": "bun run src/index.ts login",
     "discover": "bun run src/index.ts discover",
     "fetch": "bun run src/index.ts fetch",
     "typecheck": "tsc -p tsconfig.json",

@@ -1,6 +1,7 @@
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { startDiscoverySession } from "../discovery/playwrightSession";
+import { getDefaultDiscoveryDir, getDefaultSessionPath, getStateDir } from "../shared/paths";
 
 const toTimestampFolder = (date: Date): string => {
   return date.toISOString().replace(/[:.]/g, "-");
@@ -10,7 +11,7 @@ export const runDiscoverCommand = async (args: string[]): Promise<void> => {
   const outputBaseFlag = args.find((arg) => arg.startsWith("--out="));
   const loginWaitFlag = args.find((arg) => arg.startsWith("--login-wait="));
   const browseWaitFlag = args.find((arg) => arg.startsWith("--browse-wait="));
-  const outputBaseDir = outputBaseFlag ? outputBaseFlag.slice("--out=".length) : ".aula/discovery";
+  const outputBaseDir = outputBaseFlag ? outputBaseFlag.slice("--out=".length) : getDefaultDiscoveryDir();
   const outputDir = resolve(outputBaseDir, toTimestampFolder(new Date()));
   const loginWaitSeconds = loginWaitFlag ? Number.parseInt(loginWaitFlag.slice("--login-wait=".length), 10) : undefined;
   const browseWaitSeconds = browseWaitFlag
@@ -33,10 +34,11 @@ export const runDiscoverCommand = async (args: string[]): Promise<void> => {
 
   const result = await startDiscoverySession(sessionOptions);
 
-  const latestStorageStatePath = resolve(".aula/latest-storage-state.json");
-  await mkdir(resolve(".aula"), { recursive: true });
+  const latestStorageStatePath = resolve(getDefaultSessionPath());
+  const stateDir = resolve(getStateDir());
+  await mkdir(stateDir, { recursive: true });
   await copyFile(result.storageStatePath, latestStorageStatePath);
-  await writeFile(resolve(".aula/latest-capture-dir.txt"), `${result.outputDir}\n`, "utf8");
+  await writeFile(resolve(stateDir, "latest-capture-dir.txt"), `${result.outputDir}\n`, "utf8");
 
   console.log("Discovery capture completed.");
   console.log(`Output directory: ${result.outputDir}`);
