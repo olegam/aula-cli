@@ -10,7 +10,7 @@ export const getStateDir = (): string => {
 };
 
 export const getDefaultSessionPath = (): string => {
-  return resolve(getStateDir(), "latest-storage-state.json");
+  return resolve(getStateDir(), "session.json");
 };
 
 export const getDefaultBootstrapPath = (): string => {

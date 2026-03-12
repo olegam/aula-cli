@@ -1,6 +1,6 @@
 # Aula CLI
 
-Read-only CLI for Aula with browser-based MitID login and session reuse. Also check out the companion tool [`aula-cli-my-kids-photos`](https://github.com/olegam/aula-cli-my-kids-photos) for saving photos that contain your own kids.
+Read-only CLI for Aula with browser-assisted MitID login, OIDC tokens, and automatic session refresh. Also check out the companion tool [`aula-cli-my-kids-photos`](https://github.com/olegam/aula-cli-my-kids-photos) for saving photos that contain your own kids.
 
 Useful for integrating Aula with personal AI agents such as OpenClaw. For example tell your agent:
 
@@ -30,9 +30,9 @@ After linking, you can run `aula-cli ...` directly.
 
 ## Quick Start
 
-1. Login (or refresh expired session):
+1. Login:
    - `aula-cli login`
-   - This also refreshes and saves bootstrap IDs to `~/.aula-cli/bootstrap.json`.
+   - This saves an OIDC-backed session to `~/.aula-cli/session.json` and refreshes bootstrap IDs in `~/.aula-cli/bootstrap.json`.
 2. List recent message threads:
    - `aula-cli messages threads --page=0`
 3. Read messages in a specific thread:
@@ -47,7 +47,7 @@ By default, command output is shown as a table with key fields.
 
 ## Main Commands
 
-- `login [--session=~/.aula-cli/latest-storage-state.json] [--wait=180]`
+- `login [--session=~/.aula-cli/session.json] [--wait=180]`
 - `bootstrap [--session=...] [--base-url=...] [--output=json]`
 - `me [--session=...] [--output=json]`
 - `notifications [--children=1,2] [--institutions=CODE] [--session=...] [--output=json]`
@@ -68,9 +68,10 @@ By default, command output is shown as a table with key fields.
 ## Session Files
 
 - Default state directory: `~/.aula-cli`
-- Default session path: `~/.aula-cli/latest-storage-state.json`
+- Default session path: `~/.aula-cli/session.json`
 - Bootstrap hints path: `~/.aula-cli/bootstrap.json`
-- Re-run `login` whenever session expires.
+- The CLI refreshes access tokens automatically when it has a valid refresh token.
+- Re-run `login` if the refresh token is revoked or expires.
 - Keep `~/.aula-cli` private; it may contain sensitive session data.
 - Optional override: set `AULA_CLI_HOME=/custom/path`.
 

@@ -19,7 +19,7 @@ const printHelp = () => {
   console.log("Output format: default table, set --output=json for raw JSON.");
   console.log("");
   console.log("Commands:");
-  console.log(`  login [--session=${defaultSessionPath}] [--wait=180] (refreshes session + bootstrap)`);
+  console.log(`  login [--session=${defaultSessionPath}] [--wait=180] (OIDC login + refresh-token session)`);
   console.log(`  discover [--out=${defaultDiscoveryDir}] [--login-wait=120] [--browse-wait=180]`);
   console.log("  bootstrap [--session=...] [--base-url=...]");
   console.log(`  me [--session=${defaultSessionPath}] [--base-url=https://www.aula.dk]`);

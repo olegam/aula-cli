@@ -1,7 +1,7 @@
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { startDiscoverySession } from "../discovery/playwrightSession";
-import { getDefaultDiscoveryDir, getDefaultSessionPath, getStateDir } from "../shared/paths";
+import { getDefaultDiscoveryDir, getStateDir } from "../shared/paths";
 
 const toTimestampFolder = (date: Date): string => {
   return date.toISOString().replace(/[:.]/g, "-");
@@ -34,10 +34,8 @@ export const runDiscoverCommand = async (args: string[]): Promise<void> => {
 
   const result = await startDiscoverySession(sessionOptions);
 
-  const latestStorageStatePath = resolve(getDefaultSessionPath());
   const stateDir = resolve(getStateDir());
   await mkdir(stateDir, { recursive: true });
-  await copyFile(result.storageStatePath, latestStorageStatePath);
   await writeFile(resolve(stateDir, "latest-capture-dir.txt"), `${result.outputDir}\n`, "utf8");
 
   console.log("Discovery capture completed.");
@@ -46,7 +44,6 @@ export const runDiscoverCommand = async (args: string[]): Promise<void> => {
   console.log(`Responses: ${result.responsesPath}`);
   console.log(`Endpoint catalog: ${result.endpointCatalogPath}`);
   console.log(`Storage state: ${result.storageStatePath}`);
-  console.log(`Latest storage state copy: ${latestStorageStatePath}`);
   if (result.interruptedBySignal) {
     console.log(`Capture finalized after signal: ${result.interruptedBySignal}`);
   }

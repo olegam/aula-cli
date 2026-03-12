@@ -6,7 +6,14 @@ import type { SessionState } from "./session/types";
 export type { DiscoveredEndpoint } from "./endpoints/discovered";
 export type { AulaApiResponse } from "./endpoints/v23";
 export type { HttpTransport, RequestConfig } from "./http/transport";
-export type { BrowserStorageState, OriginStorage, SessionState, StorageCookie } from "./session/types";
+export type {
+  AulaSessionCookies,
+  BrowserStorageState,
+  OriginStorage,
+  SessionState,
+  StorageCookie,
+  TokenState
+} from "./session/types";
 
 export const createAulaApiClient = (session: SessionState) => {
   const transport = createFetchTransport(session);

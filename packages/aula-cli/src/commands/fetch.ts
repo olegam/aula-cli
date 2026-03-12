@@ -1,8 +1,8 @@
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createAulaApiClient, type BrowserStorageState, type SessionState } from "@aula/api-client";
+import { createAulaApiClient } from "@aula/api-client";
 import { getDefaultSessionPath } from "../shared/paths";
 import { printOutput } from "../shared/output";
+import { loadSessionState, saveSessionState } from "../shared/session";
 
 const parseArgs = (args: string[]) => {
   const path = args[0];
@@ -36,12 +36,9 @@ const parseArgs = (args: string[]) => {
 export const runFetchCommand = async (args: string[]): Promise<void> => {
   const parsed = parseArgs(args);
   const sessionPath = resolve(parsed.sessionPath);
-  const storageStateRaw = await readFile(sessionPath, "utf8");
-  const storageState = JSON.parse(storageStateRaw) as BrowserStorageState;
-
-  const session: SessionState = {
-    baseUrl: parsed.baseUrl,
-    storageState
+  const session = await loadSessionState(sessionPath, parsed.baseUrl);
+  session.persist = async (nextSession) => {
+    await saveSessionState(sessionPath, nextSession);
   };
 
   const client = createAulaApiClient(session);
