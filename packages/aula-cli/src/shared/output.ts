@@ -287,4 +287,10 @@ export const printOutput = (value: unknown, args: string[], options: PrintOutput
     return;
   }
   printTable(value, args, options);
+  if (value && typeof value === "object") {
+    const enriched = value as { revisions?: unknown; pagination?: unknown; availability?: unknown };
+    if (enriched.availability) console.log("Availability:", JSON.stringify(enriched.availability));
+    if (enriched.pagination) console.log("Pagination:", JSON.stringify(enriched.pagination));
+    if (enriched.revisions) console.log("Revisions:", JSON.stringify(enriched.revisions));
+  }
 };

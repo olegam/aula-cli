@@ -1,15 +1,17 @@
-import { getFlagValue, getNumberFlag } from "../shared/args";
+import { collectAllPages, integerFlag, trackRevisions, validateSnapshotArgs } from "../shared/content";
 import { printOutput } from "../shared/output";
 import { createClientFromArgs } from "../shared/session";
 
 export const runMessagesCommand = async (args: string[]): Promise<void> => {
+  validateSnapshotArgs(args);
   const subcommand = args[0];
   const client = await createClientFromArgs(args);
 
   if (subcommand === "threads") {
-    const result = await client.v23.getThreads({
-      page: getNumberFlag(args, "page", 0)
-    });
+    const page = integerFlag(args, "page", 0);
+    const fetchPage = (cursor: number) => client.v23.getThreads({ page: cursor });
+    const fetched = args.includes("--all") ? await collectAllPages(fetchPage, "threads", page, 1, integerFlag(args, "max-pages", 100, 1, 1000)) : await fetchPage(page);
+    const result = await trackRevisions(fetched, "threads", args, "threads");
     printOutput(result, args, {
       importantFields: [
         "id",
@@ -25,16 +27,15 @@ export const runMessagesCommand = async (args: string[]): Promise<void> => {
   }
 
   if (subcommand === "thread") {
-    const threadIdRaw = getFlagValue(args, "thread-id");
-    const threadId = threadIdRaw ? Number.parseInt(threadIdRaw, 10) : Number.NaN;
-    if (!Number.isFinite(threadId)) {
+    const threadId = integerFlag(args, "thread-id", 0, 1, Number.MAX_SAFE_INTEGER);
+    if (!threadId) {
       throw new Error("Missing or invalid --thread-id=<number>");
     }
 
-    const result = await client.v23.getMessagesForThread({
-      threadId,
-      page: getNumberFlag(args, "page", 0)
-    });
+    const page = integerFlag(args, "page", 0);
+    const fetchPage = (cursor: number) => client.v23.getMessagesForThread({ threadId, page: cursor });
+    const fetched = args.includes("--all") ? await collectAllPages(fetchPage, "messages", page, 1, integerFlag(args, "max-pages", 100, 1, 1000)) : await fetchPage(page);
+    const result = await trackRevisions(fetched, "messages", args, `thread:${threadId}`);
     printOutput(result, args, {
       importantFields: ["id", "sendDateTime", "senderName", "text", "creator.fullName", "attachments", "isForwarded"]
     });

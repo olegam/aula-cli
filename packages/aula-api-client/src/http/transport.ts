@@ -14,6 +14,32 @@ export type HttpTransport = {
   request<T>(config: RequestConfig): Promise<T>;
 };
 
+const READ_METHODS = new Set([
+  "profiles.getProfileTypesByLogin", "profiles.getProfilesByLogin", "profiles.getProfileContext",
+  "notifications.getNotificationsForActiveProfile", "posts.getAllPosts", "posts.getById", "comments.getComments", "messaging.getThreads",
+  "messaging.getMessagesForThread", "calendar.getImportantDates", "calendar.getEventsByProfileIdsAndResourceIds",
+  "presence.getDailyOverview", "presence.getPresenceStates", "presence.getPresenceConfigurationByChildIds",
+  "presence.getClosedDays", "presence.getOpeningHoursByInstitutionCodes", "gallery.getAlbums", "gallery.getMedia"
+]);
+export const assertReadRequest = (session: SessionState, config: RequestConfig): void => {
+  const base = new URL(session.baseUrl);
+  if (base.origin !== "https://www.aula.dk" || base.username || base.password) throw new Error("Unapproved Aula base URL.");
+  const url = toUrl(session.baseUrl, config.path, config.query);
+  if (url.origin !== "https://www.aula.dk" || url.username || url.password || url.hash || url.pathname !== "/api/v24/") {
+    throw new Error("Request destination is not an approved Aula API endpoint.");
+  }
+  const methods = url.searchParams.getAll("method");
+  if (methods.length !== 1 || !READ_METHODS.has(methods[0]!)) throw new Error("RPC method is not approved for read-only access.");
+  const method = config.method ?? "GET";
+  if (method !== "GET" && !(method === "POST" && methods[0] === "calendar.getEventsByProfileIdsAndResourceIds")) throw new Error("HTTP method is not approved for this read operation.");
+  if (session.auth && session.auth.tokenEndpoint !== "https://login.aula.dk/simplesaml/module.php/oidc/token.php") throw new Error("Unapproved token endpoint.");
+};
+
+const safeFetch = async (input: string | URL, init: RequestInit = {}): Promise<Response> => {
+  try { return await fetch(input, {...init, redirect: "error", signal: AbortSignal.timeout(30_000)}); }
+  catch { throw new Error("Aula network request failed or timed out; details suppressed to protect credentials."); }
+};
+
 const ACCESS_TOKEN_REFRESH_SKEW_MS = 60_000;
 
 const AULA_APP_HEADERS = {
@@ -174,10 +200,11 @@ const updateSessionCookiesFromHeaders = (session: SessionState, headers: Headers
 
 const readJsonResponse = async <T>(response: Response, url: URL): Promise<T> => {
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText} (${url.toString()})`);
+    throw new Error(`Request failed: ${response.status}`);
   }
 
-  return (await response.json()) as T;
+  try { return (await response.json()) as T; }
+  catch { throw new Error("Aula returned invalid JSON; details suppressed."); }
 };
 
 const choosePortalRole = (roles: string[]): string => {
@@ -192,6 +219,7 @@ const choosePortalRole = (roles: string[]): string => {
 
 const refreshAccessToken = async (session: SessionState): Promise<void> => {
   const auth = session.auth;
+  if (auth && auth.tokenEndpoint !== "https://login.aula.dk/simplesaml/module.php/oidc/token.php") throw new Error("Unapproved token endpoint.");
   if (!auth) {
     return;
   }
@@ -202,7 +230,7 @@ const refreshAccessToken = async (session: SessionState): Promise<void> => {
     client_id: auth.clientId
   });
 
-  const response = await fetch(auth.tokenEndpoint, {
+  const response = await safeFetch(auth.tokenEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
@@ -283,14 +311,14 @@ const bootstrapAulaSession = async (session: SessionState): Promise<void> => {
   await ensureFreshAccessToken(session);
 
   const auth = session.auth;
-  const profileTypesUrl = toUrl(session.baseUrl, "/api/v23/", {
+  const profileTypesUrl = toUrl(session.baseUrl, "/api/v24/", {
     method: "profiles.getProfileTypesByLogin",
     access_token: auth.accessToken
   });
-  const profileTypesResponse = await fetch(profileTypesUrl, {
+  const profileTypesResponse = await safeFetch(profileTypesUrl, {
     headers: buildAuthenticatedHeaders(session, {
       method: "GET",
-      path: "/api/v23/"
+      path: "/api/v24/"
     })
   });
 
@@ -305,16 +333,16 @@ const bootstrapAulaSession = async (session: SessionState): Promise<void> => {
     deviceId
   });
 
-  const profileContextUrl = toUrl(session.baseUrl, "/api/v23/", {
+  const profileContextUrl = toUrl(session.baseUrl, "/api/v24/", {
     method: "profiles.getProfileContext",
     portalrole: portalRole,
     deviceId,
     access_token: auth.accessToken
   });
-  const profileContextResponse = await fetch(profileContextUrl, {
+  const profileContextResponse = await safeFetch(profileContextUrl, {
     headers: buildAuthenticatedHeaders(session, {
       method: "GET",
-      path: "/api/v23/"
+      path: "/api/v24/"
     })
   });
 
@@ -376,6 +404,7 @@ const createRequestUrl = async (session: SessionState, config: RequestConfig): P
 };
 
 const executeRequest = async <T>(session: SessionState, config: RequestConfig): Promise<T> => {
+  assertReadRequest(session, config);
   const url = await createRequestUrl(session, config);
   const headers = buildAuthenticatedHeaders(session, config);
 
@@ -396,27 +425,28 @@ const executeRequest = async <T>(session: SessionState, config: RequestConfig): 
     init.body = body;
   }
 
-  const response = await fetch(url, init);
+  const response = await safeFetch(url, init);
   const cookiesChanged = updateSessionCookiesFromHeaders(session, response.headers);
   if (cookiesChanged) {
     await persistSession(session);
   }
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText} (${url.toString()})`);
+    throw new Error(`Request failed: ${response.status}`);
   }
 
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    return (await response.json()) as T;
+    try { return (await response.json()) as T; }
+  catch { throw new Error("Aula returned invalid JSON; details suppressed."); }
   }
 
   return (await response.text()) as T;
 };
 
 export const createFetchTransport = (session: SessionState): HttpTransport => {
-  return {
-    async request<T>(config: RequestConfig): Promise<T> {
+  let queue: Promise<unknown> = Promise.resolve();
+  const request = async <T>(config: RequestConfig): Promise<T> => {
       try {
         return await executeRequest<T>(session, config);
       } catch (error) {
@@ -441,6 +471,10 @@ export const createFetchTransport = (session: SessionState): HttpTransport => {
 
         return executeRequest<T>(session, config);
       }
-    }
   };
+  return { request<T>(config: RequestConfig): Promise<T> {
+    const next = queue.then(() => request<T>(config));
+    queue = next.catch(() => {});
+    return next;
+  }};
 };

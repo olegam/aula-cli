@@ -7,27 +7,27 @@ import { getFlagValue } from "../shared/args";
 import { getDefaultSessionPath } from "../shared/paths";
 import { saveSessionState } from "../shared/session";
 
-const AULA_CLIENT_ID = "_99949a54b8b65423862aac1bf629599ed64231607a";
-const AULA_SCOPE = "aula-sensitive";
-const AULA_REDIRECT_URI = "https://app-private.aula.dk";
-const AULA_AUTHORIZE_ENDPOINT = "https://login.aula.dk/simplesaml/module.php/oidc/authorize.php";
-const AULA_TOKEN_ENDPOINT = "https://login.aula.dk/simplesaml/module.php/oidc/token.php";
+export const AULA_CLIENT_ID = "_99949a54b8b65423862aac1bf629599ed64231607a";
+export const AULA_SCOPE = "aula-sensitive";
+export const AULA_REDIRECT_URI = "https://app-private.aula.dk";
+export const AULA_AUTHORIZE_ENDPOINT = "https://login.aula.dk/simplesaml/module.php/oidc/authorize.php";
+export const AULA_TOKEN_ENDPOINT = "https://login.aula.dk/simplesaml/module.php/oidc/token.php";
 
 const toBase64Url = (value: Buffer): string => {
   return value.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 };
 
-const createPkcePair = (): { codeVerifier: string; codeChallenge: string } => {
+export const createPkcePair = (): { codeVerifier: string; codeChallenge: string } => {
   const codeVerifier = toBase64Url(randomBytes(48));
   const codeChallenge = toBase64Url(createHash("sha256").update(codeVerifier).digest());
   return { codeVerifier, codeChallenge };
 };
 
-const createRandomState = (): string => {
+export const createRandomState = (): string => {
   return toBase64Url(randomBytes(18));
 };
 
-const buildAuthorizeUrl = (state: string, codeChallenge: string): string => {
+export const buildAuthorizeUrl = (state: string, codeChallenge: string): string => {
   const url = new URL(AULA_AUTHORIZE_ENDPOINT);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("state", state);
@@ -39,7 +39,7 @@ const buildAuthorizeUrl = (state: string, codeChallenge: string): string => {
   return url.toString();
 };
 
-const exchangeAuthorizationCode = async (
+export const exchangeAuthorizationCode = async (
   code: string,
   codeVerifier: string
 ): Promise<{
@@ -57,6 +57,8 @@ const exchangeAuthorizationCode = async (
   });
 
   const response = await fetch(AULA_TOKEN_ENDPOINT, {
+    signal: AbortSignal.timeout(30_000),
+    redirect: "error",
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
@@ -65,7 +67,7 @@ const exchangeAuthorizationCode = async (
   });
 
   if (!response.ok) {
-    throw new Error(`Aula token exchange failed: ${response.status} ${response.statusText}`);
+    throw new Error(`Aula token exchange failed: ${response.status}`);
   }
 
   const payload = (await response.json()) as {

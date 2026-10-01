@@ -1,7 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { writePrivateJson } from "../shared/private-files";
 import { createClientFromArgs } from "../shared/session";
-import { getDefaultBootstrapPath, getStateDir } from "../shared/paths";
+import { getDefaultBootstrapPath } from "../shared/paths";
 import { printOutput } from "../shared/output";
 
 type TraverseState = {
@@ -129,9 +128,7 @@ export const buildBootstrapData = (profilesData: unknown, contextData: unknown):
 };
 
 export const saveBootstrapData = async (bootstrap: BootstrapData, outputPath = getDefaultBootstrapPath()) => {
-  const outputDir = resolve(getStateDir());
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(outputPath, JSON.stringify(bootstrap, null, 2), "utf8");
+  await writePrivateJson(outputPath, bootstrap);
   return outputPath;
 };
 

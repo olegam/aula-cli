@@ -109,7 +109,7 @@ export const createV23ReadClient = (transport: HttpTransport) => {
   const call = async <T>(input: RpcRequestInput): Promise<AulaApiResponse<T>> => {
     return transport.request<AulaApiResponse<T>>({
       method: input.httpMethod ?? "GET",
-      path: "/api/v23/",
+      path: "/api/v24/",
       query: createV23Query(input.methodName, input.query),
       body: input.body
     });
@@ -126,6 +126,13 @@ export const createV23ReadClient = (transport: HttpTransport) => {
           "activeInstitutionCodes[]": params.activeInstitutionCodes
         }
       }),
+    getPost: (id: number) => call<unknown>({ methodName: "posts.getById", query: { id } }),
+    getComments: (params: { parentId: number; parentType: "Post" | "Media" | "Comment"; startIndex?: number; limit?: number }) =>
+      call<unknown>({ methodName: "comments.getComments", query: {
+        parentId: params.parentId, parentType: params.parentType,
+        startIndex: params.startIndex ?? 0, limit: params.limit ?? 5,
+        includeReportedComments: false
+      }}),
     getPosts: (params: PostsParams) =>
       call<unknown>({
         methodName: "posts.getAllPosts",

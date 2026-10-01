@@ -1,6 +1,9 @@
+import { safeErrorMessage } from "./shared/errors";
+import { runCommentsCommand } from "./commands/comments";
+import { runAttachmentsCommand } from "./commands/attachments";
+import { runSplitLoginCommand } from "./commands/login-split";
 import { runBootstrapCommand } from "./commands/bootstrap";
 import { runCalendarCommand } from "./commands/calendar";
-import { runDiscoverCommand } from "./commands/discover";
 import { runFetchCommand } from "./commands/fetch";
 import { runGalleryCommand } from "./commands/gallery";
 import { runLoginCommand } from "./commands/login";
@@ -9,18 +12,22 @@ import { runMessagesCommand } from "./commands/messages";
 import { runNotificationsCommand } from "./commands/notifications";
 import { runPostsCommand } from "./commands/posts";
 import { runPresenceCommand } from "./commands/presence";
-import { getDefaultDiscoveryDir, getDefaultSessionPath } from "./shared/paths";
+import { getDefaultSessionPath } from "./shared/paths";
 
 const printHelp = () => {
   const defaultSessionPath = getDefaultSessionPath();
-  const defaultDiscoveryDir = getDefaultDiscoveryDir();
   console.log("Aula CLI");
   console.log("");
   console.log("Output format: default table, set --output=json for raw JSON.");
   console.log("");
   console.log("Commands:");
+  console.log("  posts get --post-id=123 | comments --parent-id=123 [--parent-type=Post|Media|Comment] [--all]");
+  console.log("  attachments download --post-id=123 --attachment-id=456 --out=private-dir (or --thread-id=... --message-id=...)");
+  console.log("  attachments list --input=posts.json | download --url-file=private-url.txt --out=private-directory | extract --input=local-pdf");
+  console.log("  posts/messages: --all [--max-pages=100] [--snapshot=private-snapshot.json --snapshot-account=unique-account-label]");
+  console.log("  login-split start | complete [--callback-file=private-file] (callback otherwise read from stdin)");
   console.log(`  login [--session=${defaultSessionPath}] [--wait=180] (OIDC login + refresh-token session)`);
-  console.log(`  discover [--out=${defaultDiscoveryDir}] [--login-wait=120] [--browse-wait=180]`);
+  console.log("  discover (disabled: traffic capture can expose private content)");
   console.log("  bootstrap [--session=...] [--base-url=...]");
   console.log(`  me [--session=${defaultSessionPath}] [--base-url=https://www.aula.dk]`);
   console.log("  notifications [--children=1,2] [--institutions=CODE] [--session=...]");
@@ -47,9 +54,23 @@ const main = async () => {
     return;
   }
 
-  if (command === "discover") {
-    await runDiscoverCommand(args);
+  if (command === "comments") {
+    await runCommentsCommand(args);
     return;
+  }
+
+  if (command === "attachments") {
+    await runAttachmentsCommand(args);
+    return;
+  }
+
+  if (command === "login-split") {
+    await runSplitLoginCommand(args);
+    return;
+  }
+
+  if (command === "discover") {
+    throw new Error("Discovery capture is disabled in this private read-only installation.");
   }
 
   if (command === "login") {
@@ -106,7 +127,7 @@ const main = async () => {
 };
 
 main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(message);
+  // Never print third-party exception details: fetch/Playwright errors may embed credentials.
+  console.error(safeErrorMessage(error));
   process.exit(1);
 });

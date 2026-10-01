@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { writePrivateJson } from "./private-files";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { createAulaApiClient, type BrowserStorageState, type SessionState } from "@aula/api-client";
 import { getFlagValue } from "./args";
 import { getDefaultSessionPath } from "./paths";
@@ -19,8 +20,7 @@ const stripPersist = (session: SessionState): SessionState => {
 };
 
 export const saveSessionState = async (sessionPath: string, session: SessionState): Promise<void> => {
-  await mkdir(dirname(sessionPath), { recursive: true });
-  await writeFile(sessionPath, JSON.stringify(stripPersist(session), null, 2), "utf8");
+  await writePrivateJson(sessionPath, stripPersist(session));
 };
 
 export const loadSessionState = async (sessionPath: string, baseUrl: string): Promise<SessionState> => {
