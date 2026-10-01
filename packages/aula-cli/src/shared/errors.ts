@@ -12,6 +12,8 @@ export const safeErrorMessage = (error: unknown): string => {
     "Attachment request failed; signed URL suppressed",
     "Attachment download interrupted or exceeded size limit; partial file removed",
     "Attachment too large",
+    "Attachment download could not start; no output file created",
+    "Attachment download failed; partial file cleanup could not be confirmed",
     "Document extraction failed; PDF requires Poppler pdftotext and DOCX requires Python 3",
     "Expected one available attachment with no reported scan block with this ID in the refreshed parent",
     "Message not found within the scanned pages",

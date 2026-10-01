@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import { mkdtemp, readFile, realpath, stat, rm, writeFile, symlink, readdir } from "node:fs/promises";
+import { describe, expect, test, spyOn } from "bun:test";
+import { mkdtemp, readFile, realpath, stat, rm, writeFile, symlink, readdir, open, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { collectAllPages, contentDigest, integerFlag, trackRevisions, validateSnapshotArgs } from "../shared/content";
@@ -26,10 +26,10 @@ describe("revision detection", () => {
     expect(() => validateSnapshotArgs(["--snapshot=file.json", "--snapshot-account=parent-a"])).not.toThrow();
   });
   test("text and attachment identity changes count; signed URL expiry does not", () => {
-    const row = {content:{html:"hello"}, attachments:[{url:"https://media-prod.aula.dk/file.pdf?signature=one"}]};
-    expect(contentDigest(row)).toBe(contentDigest({...row, attachments:[{url:"https://media-prod.aula.dk/file.pdf?signature=two"}]}));
+    const row = {content:{html:"hello"}, attachments:[{file:{url:"https://media-prod.aula.dk/file.pdf?Signature=one"}}]};
+    expect(contentDigest(row)).toBe(contentDigest({...row, attachments:[{file:{url:"https://media-prod.aula.dk/file.pdf?Signature=two"}}]}));
     expect(contentDigest(row)).not.toBe(contentDigest({...row, content:{html:"edited"}}));
-    expect(contentDigest(row)).not.toBe(contentDigest({...row, attachments:[{url:"https://media-prod.aula.dk/replaced.pdf"}]}));
+    expect(contentDigest(row)).not.toBe(contentDigest({...row, attachments:[{file:{url:"https://media-prod.aula.dk/replaced.pdf"}}]}));
   });
   test("snapshots are private, scoped, and retain older rows", async () => {
     const dir = await mkdtemp(join(tmpdir(), "aula-revisions-"));
@@ -173,4 +173,140 @@ sys.stdout.buffer.write(b.getvalue())`;
     await writeFile(path, create("oversize"));
     await expect(extractAttachment(path)).rejects.toThrow("Document extraction failed");
   } finally { await rm(dir, {recursive:true,force:true}); }
+});
+
+test("revision canonicalization ignores only observed signed metadata fields", async () => {
+  const { canonicalContent } = await import("../shared/content");
+  const before = {
+    sender: { profilePicture: { url: "https://media-prod.aula.dk/avatar.png?Signature=one" } },
+    relatedProfiles: [{ profilePicture: { url: "https://media-prod.aula.dk/other.png?Expires=one" } }],
+    attachments: [{ id: 12, file: { id: 7, url: "https://media-prod.aula.dk/doc.pdf?Signature=one" }, media: {
+      file: {url: "https://media-prod.aula.dk/photo.jpg?Signature=one"},
+      smallThumbnailUrl: "https://media-prod.aula.dk/small.jpg?Signature=one",
+      largeThumbnailUrl: "https://media-prod.aula.dk/large.jpg?Signature=one",
+      mediumThumbnailUrl: "https://media-prod.aula.dk/medium.jpg?Signature=one",
+      extraSmallThumbnailUrl: "https://media-prod.aula.dk/tiny.jpg?Signature=one",
+      thumbnailUrl: "https://media-prod.aula.dk/thumb.jpg?Signature=one"
+    } }]
+  };
+  const renewed = JSON.parse(JSON.stringify(before).replaceAll("=one", "=two"));
+  expect(canonicalContent(before)).toEqual(canonicalContent(renewed));
+  const changedPath = structuredClone(before);
+  changedPath.attachments[0]!.file.url = "https://media-prod.aula.dk/replacement.pdf?Signature=two";
+  expect(canonicalContent(before)).not.toEqual(canonicalContent(changedPath));
+  const changedId = structuredClone(before); changedId.attachments[0]!.id = 13;
+  expect(canonicalContent(before)).not.toEqual(canonicalContent(changedId));
+  for (const field of ["text", "content", "body", "html", "title", "subject"]) {
+    const first = {[field]:"https://media-prod.aula.dk/resource?document=one"};
+    const second = {[field]:"https://media-prod.aula.dk/resource?document=two"};
+    expect(canonicalContent(first)).not.toEqual(canonicalContent(second));
+  }
+  expect(canonicalContent({attachments:[{link:{url:"https://media-prod.aula.dk/page?q=one"}}]})).not.toEqual(canonicalContent({attachments:[{link:{url:"https://media-prod.aula.dk/page?q=two"}}]}));
+  expect(canonicalContent({content:{profilePicture:{url:"https://example.test/image?q=one"}}})).not.toEqual(canonicalContent({content:{profilePicture:{url:"https://example.test/image?q=two"}}}));
+  expect(contentDigest({latestMessage:before})).toBe(contentDigest({latestMessage:renewed}));
+  expect(contentDigest({text:"https://media-prod.aula.dk/page?q=one"})).not.toBe(contentDigest({text:"https://media-prod.aula.dk/page?q=two"}));
+});
+
+
+test("metadata canonicalization preserves semantic query selectors", async () => {
+  const { canonicalContent } = await import("../shared/content");
+  const metadata = (query: string) => ({attachments:[{file:{url:"https://media-prod.aula.dk/document?"+query}}]});
+  expect(canonicalContent(metadata("versionId=1&Expires=one&Signature=one&Key-Pair-Id=one"))).toEqual(canonicalContent(metadata("versionId=1&Expires=two&Signature=two&Key-Pair-Id=two")));
+  for (const key of ["document", "versionId", "response-content-type", "response-content-disposition", "unknown"]) {
+    expect(canonicalContent(metadata(key+"=one&Signature=one"))).not.toEqual(canonicalContent(metadata(key+"=two&Signature=two")));
+  }
+  expect(canonicalContent(metadata("Signature=one#page=1"))).not.toEqual(canonicalContent(metadata("Signature=two#page=2")));
+});
+
+
+test("foreign metadata hosts and ports retain signing-like queries", async () => {
+  const { canonicalContent } = await import("../shared/content");
+  for (const origin of ["https://foreign.example.test", "https://media-prod.aula.dk.evil.example", "https://media-prod.aula.dk:444", "http://media-prod.aula.dk"]) {
+    expect(canonicalContent({sender:{profilePicture:{url:origin+"/image?Signature=one"}}})).not.toEqual(canonicalContent({sender:{profilePicture:{url:origin+"/image?Signature=two"}}}));
+  }
+});
+
+
+test("reader lock-release errors cannot turn complete downloads into failures", async () => {
+  const dir = await mkdtemp(join(await realpath(tmpdir()), "aula-reader-cleanup-"));
+  try {
+    const response = new Response("complete attachment bytes");
+    const reader = response.body!.getReader();
+    const release = reader.releaseLock.bind(reader);
+    reader.releaseLock = () => { release(); throw new TypeError("synthetic post-EOF cleanup failure"); };
+    Object.defineProperty(response.body!, "getReader", { value: () => reader });
+    const result = await downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => response) as unknown as typeof fetch);
+    expect(result.bytes).toBe(25);
+    expect(await readFile(result.path, "utf8")).toBe("complete attachment bytes");
+    expect(result.sha256).toBe(require("node:crypto").createHash("sha256").update("complete attachment bytes").digest("hex"));
+    expect((await stat(result.path)).mode & 0o777).toBe(0o600);
+    expect(await readdir(dir)).toHaveLength(1);
+  } finally { await rm(dir, {recursive:true,force:true}); }
+});
+
+test("reader cleanup errors preserve sanitized failure and partial-file cleanup", async () => {
+  const dir = await mkdtemp(join(await realpath(tmpdir()), "aula-reader-failure-"));
+  try {
+    const response = new Response("unused");
+    let reads = 0;
+    const reader = {
+      read: async () => { if (reads++ === 0) return {done:false,value:new Uint8Array([1,2,3])}; throw new Error("synthetic stream failure"); },
+      cancel: () => { throw new Error("synthetic synchronous cancel failure"); },
+      releaseLock: () => { throw new Error("synthetic release failure"); }
+    };
+    Object.defineProperty(response.body!, "getReader", { value: () => reader });
+    await expect(downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => response) as unknown as typeof fetch)).rejects.toThrow("Attachment download interrupted or exceeded size limit; partial file removed");
+    expect(await readdir(dir)).toHaveLength(0);
+  } finally { await rm(dir, {recursive:true,force:true}); }
+});
+
+
+test("download write and sync failures never return successful metadata", async () => {
+  for (const method of ["writeFile", "sync"] as const) {
+    const dir = await mkdtemp(join(await realpath(tmpdir()), "aula-file-failure-"));
+    const probe = join(dir, "probe");
+    const handle = await open(probe, "wx", 0o600);
+    const prototype = Object.getPrototypeOf(handle);
+    await handle.close(); await unlink(probe);
+    const failure = spyOn(prototype, method).mockImplementation(async () => { throw new Error("synthetic filesystem failure"); });
+    try {
+      await expect(downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => new Response("attachment bytes")) as unknown as typeof fetch)).rejects.toThrow("Attachment download interrupted or exceeded size limit; partial file removed");
+      expect(await readdir(dir)).toHaveLength(0);
+    } finally { failure.mockRestore(); await rm(dir, {recursive:true,force:true}); }
+  }
+});
+
+
+test("truncated and timed-out downloads still fail and remove partial files", async () => {
+  const dir = await mkdtemp(join(await realpath(tmpdir()), "aula-incomplete-"));
+  try {
+    const truncated = new Response("short", {headers:{"content-length":"100"}});
+    await expect(downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => truncated) as unknown as typeof fetch)).rejects.toThrow("Attachment download interrupted");
+    expect(await readdir(dir)).toHaveLength(0);
+    const timedOut = new Response(new ReadableStream({pull() {throw new DOMException("synthetic expired read", "TimeoutError");}}));
+    await expect(downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => timedOut) as unknown as typeof fetch)).rejects.toThrow("Attachment download interrupted");
+    expect(await readdir(dir)).toHaveLength(0);
+  } finally { await rm(dir, {recursive:true,force:true}); }
+});
+
+
+test("reader acquisition failure creates no file or leaked file handle", async () => {
+  const dir = await mkdtemp(join(await realpath(tmpdir()), "aula-reader-start-"));
+  try {
+    const response = new Response("unused");
+    Object.defineProperty(response.body!, "getReader", { value: () => {throw new TypeError("synthetic unavailable reader");} });
+    await expect(downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => response) as unknown as typeof fetch)).rejects.toThrow("Attachment download could not start; no output file created");
+    expect(await readdir(dir)).toHaveLength(0);
+  } finally { await rm(dir, {recursive:true,force:true}); }
+});
+
+test("failed partial deletion is reported without claiming removal", async () => {
+  const dir = await mkdtemp(join(await realpath(tmpdir()), "aula-cleanup-unconfirmed-"));
+  const fs = await import("node:fs/promises");
+  const deletion = spyOn(fs, "unlink").mockImplementation(async () => {throw new Error("synthetic cleanup denied");});
+  try {
+    const truncated = new Response("partial", {headers:{"content-length":"100"}});
+    await expect(downloadAttachment("https://media-prod.aula.dk/fixture", dir, (async () => truncated) as unknown as typeof fetch)).rejects.toThrow("Attachment download failed; partial file cleanup could not be confirmed");
+    expect(await readdir(dir)).toHaveLength(1);
+  } finally { deletion.mockRestore(); await rm(dir, {recursive:true,force:true}); }
 });
