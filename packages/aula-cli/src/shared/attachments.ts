@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, realpath, unlink } from "node:fs/promises";
+import { lstat, mkdir, open, realpath, unlink, type FileHandle } from "node:fs/promises";
 import { resolve, join, parse } from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -45,15 +45,20 @@ export const downloadAttachment = async (value: string, outputDirectory: string,
   try { response = await fetcher(url, { method: "GET", redirect: "error", credentials: "omit", headers: { Accept: "application/pdf, image/*, text/plain, application/octet-stream" }, signal: AbortSignal.timeout(60_000) }); }
   catch { throw new Error("Attachment request failed; signed URL suppressed"); }
   if (!response.ok || !response.body) throw new Error(`Attachment download failed (${response.status})`);
-  const advertised = Number(response.headers.get("content-length"));
-  if (advertised > MAX_ATTACHMENT_BYTES) { await response.body.cancel(); throw new Error("Attachment too large"); }
+  const lengthHeader = response.headers.get("content-length");
+  const advertised = lengthHeader !== null && /^\d+$/.test(lengthHeader) ? Number(lengthHeader) : undefined;
+  if (advertised !== undefined && advertised > MAX_ATTACHMENT_BYTES) { await response.body.cancel(); throw new Error("Attachment too large"); }
   // Never use response filenames or remote path components for local paths.
   const path = join(directory, `attachment-${randomUUID()}.bin`);
-  const file = await open(path, "wx", 0o600);
-  const reader = response.body.getReader();
+  let file: FileHandle | undefined;
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let ownsFile = false;
   const hash = createHash("sha256");
   let size = 0;
   try {
+    reader = response.body.getReader();
+    file = await open(path, "wx", 0o600);
+    ownsFile = true;
     while (true) {
       const { done, value: chunk } = await reader.read();
       if (done) break;
@@ -62,15 +67,26 @@ export const downloadAttachment = async (value: string, outputDirectory: string,
       hash.update(chunk);
       await file.writeFile(chunk);
     }
+    // Fetch may decode compressed bodies, whose Content-Length describes the
+    // encoded representation. Compare lengths only for unencoded responses.
+    const encoding = response.headers.get("content-encoding");
+    if (advertised !== undefined && (!encoding || encoding === "identity") && size !== advertised) throw new Error("Attachment length mismatch");
     await file.sync();
     await file.close();
     return { path, bytes: size, sha256: hash.digest("hex"), contentType: response.headers.get("content-type")?.split(";")[0] ?? "unknown" };
   } catch {
-    await reader.cancel().catch(() => {});
-    await file.close().catch(() => {});
-    await unlink(path).catch(() => {});
+    try { await reader?.cancel(); } catch { /* Cleanup must not hide the download failure. */ }
+    try { await file?.close(); } catch { /* Continue removing our incomplete output. */ }
+    if (!ownsFile) throw new Error("Attachment download could not start; no output file created");
+    try { await unlink(path); }
+    catch { throw new Error("Attachment download failed; partial file cleanup could not be confirmed"); }
     throw new Error("Attachment download interrupted or exceeded size limit; partial file removed");
-  } finally { reader.releaseLock(); }
+  } finally {
+    // Some runtime-backed response streams can reject lock release after EOF.
+    // The download outcome is already established by read/sync/close; cleanup
+    // must not replace successful metadata or the sanitized primary failure.
+    try { reader?.releaseLock(); } catch { /* Best-effort local stream cleanup. */ }
+  }
 };
 export const extractAttachment = async (path: string): Promise<{ text: string; noExtractableText: boolean }> => {
   const bytes = await readLocalInput(path);

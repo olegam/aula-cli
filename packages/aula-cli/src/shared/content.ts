@@ -46,13 +46,41 @@ export const collectAllPages = async (fetchPage: (cursor: number) => Promise<unk
   }
   throw new Error("Pagination limit reached before an empty page; increase --max-pages");
 };
+const isVolatileMetadataUrl = (path: string[]): boolean => {
+  // Never alter authored text/HTML or explicit links, even when their strings
+  // happen to point at the same host as a signed attachment.
+  if (path.some(part => ["text", "html", "content", "body", "title", "subject", "link", "links"].includes(part))) return false;
+  const tail = path.slice(-2).join(".");
+  if (tail === "profilePicture.url") return true;
+  const attachmentAt = path.lastIndexOf("attachments");
+  if (attachmentAt < 0) return false;
+  const attachmentPath = path.slice(attachmentAt + 1);
+  // Arrays use a literal '*' component. Accept only observed attachment shapes.
+  if (attachmentPath[0] !== "*") return false;
+  const field = attachmentPath.slice(1).join(".");
+  return field === "file.url" || field === "media.file.url" ||
+    /^media\.(smallThumbnailUrl|largeThumbnailUrl|mediumThumbnailUrl|extraSmallThumbnailUrl|thumbnailUrl)$/.test(field);
+};
 export const canonicalContent = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalContent);
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k,v]) => [k, canonicalContent(v)]));
-  if (typeof value === "string" && value.startsWith("https://media-prod.aula.dk/")) {
-    try { const url = new URL(value); return `${url.origin}${url.pathname}`; } catch { /* Keep malformed data unchanged. */ }
-  }
-  return value;
+  const visit = (node: unknown, path: string[]): unknown => {
+    if (Array.isArray(node)) return node.map(item => visit(item, [...path, "*"]));
+    if (node && typeof node === "object") return Object.fromEntries(Object.entries(node).sort(([a], [b]) => a.localeCompare(b)).map(([key, child]) => [key, visit(child, [...path, key])]));
+    if (typeof node === "string" && isVolatileMetadataUrl(path)) {
+      try {
+        const url = new URL(node);
+        if (url.origin === "https://media-prod.aula.dk" && !url.username && !url.password) {
+          // Observed CloudFront signing fields only. Preserve semantic selectors,
+          // response-content-* parameters and URL fragments even in metadata.
+          const signingKeys = ["Expires", "Signature", "Key-Pair-Id"];
+          if (!signingKeys.some(key => url.searchParams.has(key))) return node;
+          for (const key of signingKeys) url.searchParams.delete(key);
+          return url.toString();
+        }
+      } catch { /* Malformed or relative values retain their exact identity. */ }
+    }
+    return node;
+  };
+  return visit(value, []);
 };
 export const contentDigest = (row: Record<string, unknown>): string => {
   // Deliberately excludes read receipts and counters; includes content and attachment metadata.
